@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-mono), monospace;
+  background-color: #010409;
+  color: #e6edf3;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Select option theming (best effort — browser varies) */
+select option {
+  background-color: #161b22;
+  color: #e6edf3;
+}
+
+/* Print styles */
+@media print {
+  header button { display: none; }
+  .no-print { display: none; }
+  body { background: white; color: black; }
+  
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+}
