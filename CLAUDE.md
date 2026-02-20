@@ -21,6 +21,7 @@
 - **Styling:** TailwindCSS + IBM Plex Mono
 - **Validation:** Zod
 - **Database:** Supabase (Postgres)
+- **Auth:** Supabase Auth — Email+Password + Google OAuth
 - **Hosting:** Vercel
 
 ---
@@ -33,6 +34,13 @@ strategygrader/
 │   ├── api/
 │   │   └── analyze/
 │   │       └── route.ts          # POST /api/analyze
+│   ├── auth/
+│   │   ├── callback/
+│   │   │   └── route.ts          # OAuth + email confirmation handler
+│   │   ├── sign-in/
+│   │   │   └── page.tsx
+│   │   └── sign-up/
+│   │       └── page.tsx
 │   ├── report/
 │   │   └── page.tsx              # Report display page
 │   ├── globals.css
@@ -41,15 +49,19 @@ strategygrader/
 ├── config/
 │   └── assetClasses.ts           # ADR lookup table
 ├── lib/
+│   ├── supabase/
+│   │   ├── client.ts             # Browser client
+│   │   └── server.ts             # Server client
 │   └── scoringEngine.ts          # Pure scoring logic
 ├── types/
 │   └── strategy.ts               # All TypeScript types
+├── middleware.ts                  # Session refresh — lives at project ROOT
 └── CLAUDE.md                     # This file
 ```
 
 ---
 
-## Current State (as of Session 2)
+## Current State (as of Session 3)
 
 ### What's Built (MVP — Complete)
 - Strategy input form (`app/page.tsx`)
@@ -59,10 +71,41 @@ strategygrader/
 - Asset class config (`config/assetClasses.ts`)
 - All TypeScript types (`types/strategy.ts`)
 
+### What's Built (Session 3 — Auth)
+- Supabase browser client (`lib/supabase/client.ts`)
+- Supabase server client (`lib/supabase/server.ts`)
+- Middleware for session refresh (`middleware.ts`) — at project root
+- Sign-in page (`app/auth/sign-in/page.tsx`) — Email+Password + Google OAuth
+- Sign-up page (`app/auth/sign-up/page.tsx`) — Email+Password + Google OAuth + email confirmation success state
+- Auth callback route (`app/auth/callback/route.ts`) — handles OAuth redirect + email confirmation
+
 ### What's NOT Built Yet
-- Supabase database tables (blank — no tables exist yet)
-- Authentication (starting from scratch)
+- Wiring auth state into existing pages (header sign in/out button, save prompt on report page)
+- Saving analyses to Supabase (currently only stored in sessionStorage)
 - Any Phase 2 features
+
+---
+
+## Environment Variables
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+SUPABASE_SECRET_KEY=your_secret_key
+```
+
+**Important:** Using new Supabase key format — publishable + secret. NOT the legacy anon/service_role keys.
+
+---
+
+## Supabase Setup Checklist
+- [x] Supabase project created and connected
+- [x] All database tables created (see schema below)
+- [x] `@supabase/ssr` installed
+- [ ] Google OAuth provider enabled in Supabase dashboard (Authentication → Providers → Google)
+- [ ] Redirect URLs configured in Supabase dashboard (Authentication → URL Configuration):
+  - `http://localhost:3000/auth/callback`
+  - `https://your-app.vercel.app/auth/callback`
 
 ---
 
@@ -93,7 +136,7 @@ strategygrader/
 
 ---
 
-## Database Schema (Designed — Not Yet Created)
+## Database Schema (Created in Supabase)
 
 ### `profiles`
 Extends Supabase Auth. Created automatically on user signup via trigger.
@@ -173,7 +216,29 @@ Pre-built templates (Phase 2 — read only).
 | score_breakdown storage | JSONB | Flexibility to evolve scoring model without migrations |
 | ai_feedback storage | JSONB | Phase 2 — null for now |
 | Win rate default | 45% conservative assumption | Flagged clearly in output when assumed |
-| Auth approach | Supabase Auth from scratch | Nothing built yet |
+| Auth methods | Email+Password + Google OAuth | Covers majority of users, low friction |
+| Auth flow | Anonymous first, prompt to save after | Removes signup friction, value before commitment |
+| Supabase key format | Publishable + Secret (new format) | Not legacy anon/service_role keys |
+
+---
+
+## Auth Flow (Important)
+
+Users do NOT need to log in to run an analysis. The flow is:
+1. User runs analysis anonymously
+2. Report page shows results
+3. A save prompt appears encouraging them to sign up / sign in to save
+4. On sign up, Supabase sends confirmation email → user clicks link → `/auth/callback` exchanges code for session → redirects to `/`
+
+**This wiring (save prompt + actually saving to DB) is NOT built yet — next session.**
+
+---
+
+## Session Workflow (How We Work Together)
+
+- User uploads changed files at start of each session
+- Claude generates updated CLAUDE.md + session summary at end of each session
+- User commits CLAUDE.md to repo after every session
 
 ---
 
@@ -204,16 +269,26 @@ Pre-built templates (Phase 2 — read only).
 
 ### Session 2
 - Reviewed Phase 2 feature priority — confirmed order is good
-- Designed full Supabase database schema (see above)
+- Designed full Supabase database schema
 - Decided on soft delete for strategy_submissions
 - Decided on JSONB for score_breakdown and ai_feedback
-- Established session workflow: user uploads changed files, Claude generates CLAUDE.md + session summary at end of session
-- **Next session:** Create Supabase tables + set up Supabase Auth
+- Established session workflow
+
+### Session 3
+- Created all Supabase tables via SQL migration (including RLS policies + triggers)
+- Installed `@supabase/ssr`
+- Built Supabase browser + server clients (`lib/supabase/`)
+- Built middleware.ts (session refresh — lives at project root)
+- Built sign-in page, sign-up page, auth callback route
+- Confirmed: new Supabase key format (publishable/secret, not legacy anon)
+- Confirmed: middleware.ts lives at root, not inside app/
+- **Still needs:** Google OAuth enabled in Supabase dashboard + redirect URLs configured
 
 ---
 
 ## Next Session Checklist
-- [ ] Create Supabase tables (SQL migrations)
-- [ ] Set up Supabase Auth
-- [ ] Wire up auth to Next.js
+- [ ] Confirm auth is working locally (test sign up + Google OAuth)
+- [ ] Add auth state to header (sign in / sign out button)
+- [ ] Wire up save prompt on report page after anonymous analysis
+- [ ] Wire up saving analysis to `strategy_submissions` table on sign in
 - [ ] Begin Phase 2 — AI feedback layer
